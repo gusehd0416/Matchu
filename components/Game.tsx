@@ -21,7 +21,8 @@ import {
   type PuzzleInfo,
 } from '../lib/game';
 
-const SHARE_URL = 'https://playmatchu.com';
+// 도메인을 사기 전까지는 지금 열린 주소를 공유한다
+const shareUrl = () => window.location.origin;
 
 // 두벌식 배열. [기본, 쉬프트]
 const KEY_ROWS: [string, string][][] = [
@@ -344,7 +345,7 @@ function Result({
   const score = totalScore(state);
 
   async function share() {
-    const text = shareText(state, day, SHARE_URL);
+    const text = shareText(state, day, shareUrl());
     try {
       if (navigator.share) await navigator.share({ text });
       else {
