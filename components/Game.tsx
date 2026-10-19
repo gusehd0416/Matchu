@@ -1,23 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { choseongOf, composeJamo, isCompleteHangul } from '../lib/hangul';
-import { judge, keyMarks, type Mark, type SyllableResult } from '../lib/judge';
+import { composeJamo, isCompleteHangul } from '../lib/hangul';
+import { keyMarks, type Mark } from '../lib/judge';
 import {
   MAX_TRIES,
   WORDS_PER_DAY,
+  applyGuess,
   goToNextWord,
   gradeOf,
   isFinished,
   kstDate,
   msUntilNextPuzzle,
   newGame,
-  puzzleFor,
   shareText,
-  submitGuess,
   totalScore,
   wordScore,
   type GameState,
+  type GuessResult,
+  type PuzzleInfo,
 } from '../lib/game';
 
 const SHARE_URL = 'https://playmatchu.com';
@@ -35,6 +36,11 @@ const CODE_TO_KEY: Record<string, [string, string]> = {};
   [...row].forEach((letter, c) => (CODE_TO_KEY[`Key${letter}`] = KEY_ROWS[r][c])),
 );
 
+const ERRORS: Record<string, string> = {
+  not_in_dictionary: '사전에 없는 단어예요',
+  wrong_length: '글자 수가 맞지 않아요',
+};
+
 const PART_NAMES = ['초성', '중성', '종성'];
 const MARK_NAMES: Record<Mark, string> = { correct: '맞음', present: '다른 글자에 있음', absent: '없음' };
 
@@ -44,8 +50,9 @@ function storageKey(date: string) {
 
 function loadGame(date: string): GameState {
   try {
-    const saved = localStorage.getItem(storageKey(date));
-    if (saved) return JSON.parse(saved) as GameState;
+    const saved = JSON.parse(localStorage.getItem(storageKey(date)) ?? 'null') as GameState | null;
+    // 예전 프로토타입 저장 형식(입력 단어만 저장)은 버린다.
+    if (saved?.words?.every((w) => w.guesses.every((g) => typeof g === 'object' && 'result' in g))) return saved;
   } catch {}
   return newGame(date);
 }
@@ -64,20 +71,25 @@ function formatCountdown(ms: number) {
 
 export default function Game() {
   const [date] = useState(() => kstDate(Date.now()));
-  const { day, answers } = useMemo(() => puzzleFor(date), [date]);
+  const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [state, setState] = useState<GameState>(() => newGame(date));
   const [jamo, setJamo] = useState<string[]>([]);
   const [shift, setShift] = useState(false);
+  const [pending, setPending] = useState(false);
   const [toast, setToast] = useState('');
   const [shake, setShake] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   // 마지막 단어를 끝낸 직후에는 정답을 먼저 보여주고, 버튼을 눌러야 결과 화면으로 간다.
   const [holdResult, setHoldResult] = useState(false);
 
-  // 저장된 진행 상황은 브라우저에서만 읽는다 (서버 렌더와 어긋나지 않게).
+  // 퍼즐 정보(초성, 글자 수)는 서버에서, 진행 상황은 브라우저 저장소에서 읽는다.
   useEffect(() => {
-    const saved = loadGame(date);
-    setState(saved);
+    fetch(`/api/puzzle?date=${date}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setPuzzle)
+      .catch(() => setLoadError(true));
+    setState(loadGame(date));
     try {
       if (!localStorage.getItem('matchu:seen-help')) {
         setShowHelp(true);
@@ -96,11 +108,10 @@ export default function Game() {
 
   const finished = isFinished(state);
   const word = state.words[state.current];
-  const answer = answers[state.current];
-  const length = [...answer].length;
+  const info = puzzle?.words[state.current];
+  const length = info?.length ?? 0;
   const typed = composeJamo(jamo);
-  const results = useMemo(() => word.guesses.map((g) => judge(g, answer)), [word.guesses, answer]);
-  const keys = useMemo(() => keyMarks(results), [results]);
+  const keys = useMemo(() => keyMarks(word.guesses.map((g) => g.result)), [word.guesses]);
 
   const fail = useCallback((message: string) => {
     setToast(message);
@@ -108,23 +119,38 @@ export default function Game() {
     setTimeout(() => setShake(false), 400);
   }, []);
 
+  const submit = useCallback(async () => {
+    if ([...typed].length !== length || !isCompleteHangul(typed)) return fail(`${length}글자 단어를 입력해 주세요`);
+    setPending(true);
+    try {
+      const response = await fetch('/api/guess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, slot: state.current, guess: typed, attempt: word.guesses.length + 1 }),
+      });
+      const body = await response.json();
+      if (!response.ok) return fail(ERRORS[body.error] ?? '잠시 후 다시 시도해 주세요');
+      const next = applyGuess(state, body as GuessResult);
+      if (isFinished(next)) setHoldResult(true);
+      setState(next);
+      setJamo([]);
+    } catch {
+      fail('인터넷 연결을 확인해 주세요');
+    } finally {
+      setPending(false);
+    }
+  }, [typed, length, date, state, word.guesses.length, fail]);
+
   const press = useCallback(
     (key: string) => {
-      if (word.status !== 'playing') return;
-      if (key === 'ENTER') {
-        if ([...typed].length !== length || !isCompleteHangul(typed)) return fail(`${length}글자 단어를 입력해 주세요`);
-        const next = submitGuess(state, typed, answer);
-        if (isFinished(next)) setHoldResult(true);
-        setState(next);
-        setJamo([]);
-        return;
-      }
+      if (!puzzle || pending || word.status !== 'playing') return;
+      if (key === 'ENTER') return void submit();
       if (key === 'BACK') return setJamo((j) => j.slice(0, -1));
       if (key === 'SHIFT') return setShift((v) => !v);
       setJamo((j) => ([...composeJamo([...j, key])].length > length ? j : [...j, key]));
       setShift(false);
     },
-    [finished, word.status, typed, length, answer, fail, state],
+    [puzzle, pending, word.status, submit, length],
   );
 
   useEffect(() => {
@@ -140,23 +166,40 @@ export default function Game() {
     return () => window.removeEventListener('keydown', onKey);
   }, [press]);
 
-  if (finished && !holdResult) return <Result state={state} answers={answers} day={day} onToast={setToast} toast={toast} />;
+  if (loadError) {
+    return (
+      <main className="app">
+        <Header day={null} onHelp={() => setShowHelp(true)} />
+        <p className="note">오늘의 퍼즐을 불러오지 못했어요. 새로고침해 주세요.</p>
+      </main>
+    );
+  }
+  if (!puzzle || !info) {
+    return (
+      <main className="app">
+        <Header day={null} onHelp={() => setShowHelp(true)} />
+        <p className="note">오늘의 퍼즐을 불러오는 중이에요</p>
+      </main>
+    );
+  }
 
-  const emptyRows = MAX_TRIES - results.length - (word.status === 'playing' ? 1 : 0);
+  if (finished && !holdResult) return <Result state={state} day={puzzle.day} onToast={setToast} toast={toast} />;
+
+  const emptyRows = MAX_TRIES - word.guesses.length - (word.status === 'playing' ? 1 : 0);
 
   return (
     <main className="app">
-      <Header day={day} onHelp={() => setShowHelp(true)} />
+      <Header day={puzzle.day} onHelp={() => setShowHelp(true)} />
       <Progress state={state} />
 
       <section className="hint" aria-live="polite">
         <span className="hint-label">{state.current + 1}번째 단어 · {length}글자</span>
-        <span className="hint-choseong">{choseongOf(answer)}</span>
+        <span className="hint-choseong">{info.choseong}</span>
       </section>
 
       <section className="board" style={{ ['--cols' as string]: length }}>
-        {results.map((row, i) => (
-          <Row key={i} result={row} />
+        {word.guesses.map((guess, i) => (
+          <Row key={i} guess={guess} />
         ))}
         {word.status === 'playing' && (
           <div className={`row current${shake ? ' shake' : ''}`}>
@@ -165,6 +208,7 @@ export default function Game() {
                 <span className="syllable">{[...typed][i] ?? ''}</span>
               </div>
             ))}
+            <div className="temp" />
           </div>
         )}
         {Array.from({ length: Math.max(emptyRows, 0) }, (_, i) => (
@@ -172,6 +216,7 @@ export default function Game() {
             {Array.from({ length }, (_, j) => (
               <div key={j} className="tile" />
             ))}
+            <div className="temp" />
           </div>
         ))}
       </section>
@@ -180,7 +225,7 @@ export default function Game() {
         <section className="word-done">
           <p>
             {word.status === 'solved' ? `${word.guesses.length}번 만에 맞혔어요!` : '아쉬워요. 정답은'}{' '}
-            <strong>{answer}</strong>
+            <strong>{word.answer}</strong>
           </p>
           <button className="primary" onClick={() => (finished ? setHoldResult(false) : setState((s) => goToNextWord(s)))}>
             {state.current + 1 < WORDS_PER_DAY ? '다음 단어' : '결과 보기'}
@@ -190,18 +235,17 @@ export default function Game() {
         <Keyboard marks={keys} shift={shift} onPress={press} />
       )}
 
-      <p className="note">프로토타입: 사전 검사와 의미 온도(꼬맨틀식 유사도)는 다음 단계에서 붙어요.</p>
       {toast && <div className="toast" role="status">{toast}</div>}
       {showHelp && <Help onClose={() => setShowHelp(false)} />}
     </main>
   );
 }
 
-function Header({ day, onHelp }: { day: number; onHelp: () => void }) {
+function Header({ day, onHelp }: { day: number | null; onHelp: () => void }) {
   return (
     <header className="header">
       <h1>맞츄</h1>
-      <span className="day">{day}일차</span>
+      {day !== null && <span className="day">{day}일차</span>}
       <button className="icon" onClick={onHelp} aria-label="게임 방법">
         ?
       </button>
@@ -221,10 +265,11 @@ function Progress({ state }: { state: GameState }) {
   );
 }
 
-function Row({ result }: { result: SyllableResult[] }) {
+function Row({ guess }: { guess: GuessResult }) {
+  const rank = guess.solved ? '정답' : guess.rank ? `${guess.rank}위` : '1000위 밖';
   return (
     <div className="row">
-      {result.map((s, i) => (
+      {guess.result.map((s, i) => (
         <div key={i} className={`tile judged${s.marks.every((m) => m === 'correct') ? ' all-correct' : ''}`}>
           <span className="syllable">{s.char}</span>
           <span className="jamo">
@@ -240,6 +285,10 @@ function Row({ result }: { result: SyllableResult[] }) {
           </span>
         </div>
       ))}
+      <div className="temp judged" title="의미 온도: 뜻이 정답과 가까울수록 높아요">
+        <strong>{guess.temperature}°</strong>
+        <span>{rank}</span>
+      </div>
     </div>
   );
 }
@@ -278,13 +327,11 @@ function Keyboard({ marks, shift, onPress }: { marks: Record<string, Mark>; shif
 
 function Result({
   state,
-  answers,
   day,
   toast,
   onToast,
 }: {
   state: GameState;
-  answers: string[];
   day: number;
   toast: string;
   onToast: (m: string) => void;
@@ -297,7 +344,7 @@ function Result({
   const score = totalScore(state);
 
   async function share() {
-    const text = shareText(state, answers, SHARE_URL);
+    const text = shareText(state, day, SHARE_URL);
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -318,7 +365,7 @@ function Result({
         <ul className="answers">
           {state.words.map((w, i) => (
             <li key={i}>
-              <span className="answer">{answers[i]}</span>
+              <span className="answer">{w.answer}</span>
               <span className="meta">
                 {w.status === 'solved' ? `${w.guesses.length}번 만에` : '실패'} · {wordScore(w)}점
               </span>
@@ -334,6 +381,7 @@ function Result({
         <div className="ad-slot" aria-hidden="true">
           광고 자리 (결과 화면 하단 배너)
         </div>
+        <Credits />
       </section>
       {toast && <div className="toast" role="status">{toast}</div>}
     </main>
@@ -359,10 +407,24 @@ function Help({ onClose }: { onClose: () => void }) {
           </li>
         </ul>
         <p>예: 정답이 지하철(ㅈㅎㅊ)일 때 기차역을 넣으면 ‘차’의 ㅊ은 노랑, ㅏ는 초록이에요.</p>
+        <p>
+          오른쪽 <strong>온도</strong>는 뜻이 정답과 얼마나 가까운지예요. 100°가 정답이고, 정답과 가까운 단어 1000위 안에 들면 순위가
+          나와요. 사전에 있는 명사만 입력할 수 있어요.
+        </p>
         <button className="primary" onClick={onClose}>
           시작하기
         </button>
+        <Credits />
       </div>
     </div>
+  );
+}
+
+/** CC BY-SA 데이터 출처 표기 */
+function Credits() {
+  return (
+    <p className="credits">
+      단어: 국립국어원 표준국어대사전(korean-noun) · 의미 온도: spaCy ko_core_news_lg · 모두 CC BY-SA 4.0
+    </p>
   );
 }

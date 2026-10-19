@@ -4,3 +4,8 @@ out
 dist
 next-env.d.ts
 *.tsbuildinfo
+
+# 비밀값
+.env
+.env.*
+!.env.example

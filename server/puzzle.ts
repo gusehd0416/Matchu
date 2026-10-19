@@ -1,0 +1,61 @@
+import 'server-only';
+import { choseongOf } from '../lib/hangul';
+import { judge } from '../lib/judge';
+import { LAUNCH_DATE, MAX_TRIES, kstDate, type GuessResult } from '../lib/game';
+import { answerList, dailySchedule, similarityFor, wordsOfLength } from './data';
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** 지금 열려 있는 날짜인지. 자정 직후 이어하기를 위해 어제까지 받는다. 미래 날짜는 막는다. */
+export function isPlayableDate(date: string, now = Date.now()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const today = kstDate(now);
+  const yesterday = kstDate(now - DAY);
+  return (date === today || date === yesterday) && date >= LAUNCH_DATE;
+}
+
+function answersFor(date: string): number[] {
+  const offset = Math.round((Date.parse(date) - Date.parse(LAUNCH_DATE)) / DAY);
+  const days = dailySchedule();
+  return days[((offset % days.length) + days.length) % days.length];
+}
+
+export function puzzleInfo(date: string) {
+  const day = Math.round((Date.parse(date) - Date.parse(LAUNCH_DATE)) / DAY) + 1;
+  const words = answersFor(date).map((i) => {
+    const answer = answerList()[i];
+    return { length: [...answer].length, choseong: choseongOf(answer) };
+  });
+  return { date, day, words };
+}
+
+export type GuessError = 'bad_request' | 'wrong_length' | 'not_in_dictionary';
+
+/**
+ * 입력 하나를 판정한다. attempt는 이 입력이 몇 번째 시도인지(1부터).
+ * 맞혔거나 마지막 기회였으면 정답을 함께 돌려준다.
+ */
+export function checkGuess(date: string, slot: number, guess: string, attempt: number): GuessResult | { error: GuessError } {
+  const slots = answersFor(date);
+  if (!Number.isInteger(slot) || slot < 0 || slot >= slots.length) return { error: 'bad_request' };
+  if (!Number.isInteger(attempt) || attempt < 1 || attempt > MAX_TRIES) return { error: 'bad_request' };
+
+  const answerIndex = slots[slot];
+  const answer = answerList()[answerIndex];
+  if ([...guess].length !== [...answer].length) return { error: 'wrong_length' };
+
+  const position = wordsOfLength([...answer].length).index.get(guess);
+  if (position === undefined) return { error: 'not_in_dictionary' };
+
+  const { temps, top } = similarityFor(answerIndex);
+  const solved = guess === answer;
+  const rank = solved ? 0 : top.indexOf(position) + 1;
+  return {
+    word: guess,
+    result: judge(guess, answer),
+    temperature: temps[position],
+    rank: rank > 0 || solved ? rank : null,
+    solved,
+    answer: solved || attempt >= MAX_TRIES ? answer : undefined,
+  };
+}
