@@ -228,11 +228,15 @@ function Row({ result }: { result: SyllableResult[] }) {
         <div key={i} className={`tile judged${s.marks.every((m) => m === 'correct') ? ' all-correct' : ''}`}>
           <span className="syllable">{s.char}</span>
           <span className="jamo">
-            {s.jamo.map((j, p) => (
-              <span key={p} className={`j ${s.marks[p]}`} title={`${PART_NAMES[p]} ${j || '없음'}: ${MARK_NAMES[s.marks[p]]}`}>
-                {j || '·'}
-              </span>
-            ))}
+            {/* 받침이 없는 글자는 받침 칸을 그리지 않는다 (지 → ㅈ ㅣ) */}
+            {s.jamo.map(
+              (j, p) =>
+                j && (
+                  <span key={p} className={`j ${s.marks[p]}`} title={`${PART_NAMES[p]} ${j}: ${MARK_NAMES[s.marks[p]]}`}>
+                    {j}
+                  </span>
+                ),
+            )}
           </span>
         </div>
       ))}
