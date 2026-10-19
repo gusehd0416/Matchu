@@ -1,5 +1,4 @@
-import puzzles from './puzzles.json';
-import { judge, type SyllableResult } from './judge';
+import type { SyllableResult } from './judge';
 
 export const MAX_TRIES = 6;
 export const WORDS_PER_DAY = 5;
@@ -19,14 +18,23 @@ export function msUntilNextPuzzle(now: number): number {
   return DAY - ((now + KST_OFFSET) % DAY);
 }
 
-/** 그날의 5단어. 프로토타입은 100일치를 돌려 쓰고, 정식 버전은 서버가 정답을 숨긴 채 판정한다. */
-export function puzzleFor(date: string): { day: number; answers: string[] } {
-  const offset = Math.round((Date.parse(date) - Date.parse(LAUNCH_DATE)) / DAY);
-  const index = ((offset % puzzles.length) + puzzles.length) % puzzles.length;
-  return { day: offset + 1, answers: puzzles[index] };
-}
+/** 서버가 알려주는 그날의 퍼즐. 정답은 없고 초성과 글자 수만 있다. */
+export type PuzzleInfo = { date: string; day: number; words: { length: number; choseong: string }[] };
 
-export type WordState = { guesses: string[]; status: 'playing' | 'solved' | 'failed' };
+/** 서버가 돌려주는 입력 하나의 판정 */
+export type GuessResult = {
+  word: string;
+  result: SyllableResult[];
+  /** 의미 온도 0~100 */
+  temperature: number;
+  /** 정답과 뜻이 가까운 순위 (1~1000위). 정답이면 0, 1000위 밖이면 null */
+  rank: number | null;
+  solved: boolean;
+  /** 맞혔거나 마지막 기회를 쓴 뒤에만 온다 */
+  answer?: string;
+};
+
+export type WordState = { guesses: GuessResult[]; status: 'playing' | 'solved' | 'failed'; answer?: string };
 export type GameState = { date: string; current: number; words: WordState[] };
 
 export function newGame(date: string): GameState {
@@ -41,13 +49,13 @@ export function isFinished(state: GameState): boolean {
   return state.words.every((w) => w.status !== 'playing');
 }
 
-/** 입력 하나를 반영한 새 상태. 검사는 호출하는 쪽에서 끝낸 뒤 부른다. */
-export function submitGuess(state: GameState, guess: string, answer: string): GameState {
+/** 서버 판정 하나를 반영한 새 상태 */
+export function applyGuess(state: GameState, guess: GuessResult): GameState {
   const words = state.words.map((w, i) => {
     if (i !== state.current) return w;
     const guesses = [...w.guesses, guess];
-    const status = guess === answer ? 'solved' : guesses.length >= MAX_TRIES ? 'failed' : 'playing';
-    return { guesses, status } as WordState;
+    const status = guess.solved ? 'solved' : guesses.length >= MAX_TRIES ? 'failed' : 'playing';
+    return { guesses, status, answer: guess.answer ?? w.answer } as WordState;
   });
   return { ...state, words };
 }
@@ -81,10 +89,9 @@ function rowEmoji(result: SyllableResult[]): string {
 }
 
 /** 정답이 드러나지 않는 공유 문구 */
-export function shareText(state: GameState, answers: string[], url: string): string {
-  const { day } = puzzleFor(state.date);
+export function shareText(state: GameState, day: number, url: string): string {
   const lines = state.words.map((w, i) => {
-    const rows = w.guesses.map((g) => rowEmoji(judge(g, answers[i]))).join(' ');
+    const rows = w.guesses.map((g) => rowEmoji(g.result)).join(' ');
     const tries = w.status === 'solved' ? `${w.guesses.length}/${MAX_TRIES}` : `X/${MAX_TRIES}`;
     return `${NUMBERS[i]} ${rows} (${tries})`;
   });
