@@ -8,7 +8,7 @@
 - 두벌식 화면 키보드 + 실제 키보드 입력, 자모 조합
 - 초성·중성·종성별 색깔 판정 (`lib/judge.ts`)
 - 사전 검사: 표준국어대사전 명사 약 9만 4천 개 (2~4글자)
-- 의미 온도: 정답과 뜻이 가까울수록 높은 0~100°, 1000위 안이면 순위
+- 힌트: 3번 틀리면 주제, 5번 틀리면 한 줄 설명 (`data/hints.csv`)
 - 서버 판정: 정답은 서버에만 있고, 맞히거나 6번을 다 쓰면 그때 공개
 - 단어당 6번 기회, 점수와 등급, 정답이 드러나지 않는 결과 공유
 - 진행 상황 브라우저 저장
@@ -26,18 +26,18 @@ npm test           # 판정·서버 로직 테스트
 ## API
 
 - `GET /api/puzzle?date=YYYY-MM-DD`: 그날 5단어의 초성과 글자 수 (정답 없음). 오늘과 어제만 열림
-- `POST /api/guess` `{ date, slot, guess, attempt }`: 자모 판정, 온도, 순위. 맞혔거나 `attempt`가 6이면 정답 포함
+- `POST /api/guess` `{ date, slot, guess, attempt }`: 자모 판정, 단계별 주제·설명 힌트. 맞혔거나 `attempt`가 6이면 정답 포함
 
 ## 구조
 
 - `lib/hangul.ts`: 음절 분해, 초성, 자모 조합
 - `lib/judge.ts`: 자모 판정, 키보드 색
 - `lib/game.ts`: 진행 상태, 점수, 공유 문구 (브라우저용, 정답 없음)
-- `server/`: 정답·사전·온도 데이터 읽기와 판정 (서버 전용)
+- `server/`: 정답·사전·힌트 데이터 읽기와 판정 (서버 전용)
 - `app/api/`: 퍼즐 정보와 판정 API
 - `components/Game.tsx`: 게임 화면
 
 ## 데이터
 
 - `data/answer_candidates.csv`, `data/puzzles_100days.csv`: 정답 후보 500개와 100일 배정표
-- `data/words/`, `data/sim/`: 사전과 의미 온도. 만드는 법과 출처(CC BY-SA 4.0)는 `scripts/similarity/README.md`
+- `data/words/`: 입력 허용 사전. 만드는 법과 출처(CC BY-SA 4.0)는 `scripts/similarity/README.md`

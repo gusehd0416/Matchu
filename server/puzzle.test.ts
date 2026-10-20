@@ -33,7 +33,7 @@ describe('puzzle', () => {
     }
   });
 
-  it('판정: 사전 검사, 온도, 순위, 정답 공개 시점', () => {
+  it('판정: 사전 검사, 힌트와 정답 공개 시점', () => {
     const answer = answerList()[dailySchedule()[0][0]];
     expect(checkGuess('2026-10-19', 0, '뷁'.repeat([...answer].length), 1)).toEqual({ error: 'not_in_dictionary' });
     expect(checkGuess('2026-10-19', 0, '가나다라마', 1)).toEqual({ error: 'wrong_length' });
@@ -45,8 +45,6 @@ describe('puzzle', () => {
     if ('error' in miss) return;
     expect(miss.solved).toBe(false);
     expect(miss.answer).toBeUndefined();
-    expect(miss.temperature).toBeGreaterThanOrEqual(0);
-    expect(miss.temperature).toBeLessThan(100);
 
     const last = checkGuess('2026-10-19', 0, other, 6);
     expect('error' in last ? null : last.answer).toBe(answer);
@@ -58,17 +56,6 @@ describe('puzzle', () => {
     expect('error' in fifth ? null : typeof fifth.clue).toBe('string');
 
     const hit = checkGuess('2026-10-19', 0, answer, 2);
-    expect(hit).toMatchObject({ solved: true, temperature: 100, rank: 0, answer });
-  });
-
-  it('뜻이 가까운 단어가 더 높은 온도와 순위를 받는다', () => {
-    // 2일차 2번 '터널'로 확인: 같은 글자 수 단어 중 '도로'가 '사과'보다 가깝다
-    const slot = dailySchedule()[1].findIndex((i) => answerList()[i] === '터널');
-    expect(slot).toBeGreaterThanOrEqual(0);
-    const near = checkGuess('2026-10-20', slot, '도로', 1);
-    const far = checkGuess('2026-10-20', slot, '사과', 1);
-    if ('error' in near || 'error' in far) throw new Error('판정 실패');
-    expect(near.temperature).toBeGreaterThan(far.temperature);
-    expect(near.rank).not.toBeNull();
+    expect(hit).toMatchObject({ solved: true, answer });
   });
 });

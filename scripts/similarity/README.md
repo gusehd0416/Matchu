@@ -1,6 +1,6 @@
 # 사전·의미 온도 데이터 만들기
 
-`data/words`와 `data/sim`은 이 스크립트로 만든 결과물입니다. 정답 후보(`data/answer_candidates.csv`)를 바꾸면 다시 돌리세요.
+`data/words`는 이 스크립트로 만든 결과물입니다. 의미 온도 기능은 2026-10-20에 뺐기 때문에 스크립트가 함께 만드는 `data/sim`은 저장소에 넣지 않습니다. 정답 후보(`data/answer_candidates.csv`)를 바꾸면 다시 돌리세요.
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate

@@ -1,6 +1,5 @@
 import 'server-only';
 import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 
 // 정답과 사전은 서버에서만 읽는다. 클라이언트 번들에는 들어가지 않는다.
@@ -10,7 +9,6 @@ let answers: string[] | undefined;
 let schedule: number[][] | undefined;
 let hints: Map<string, { topic: string; clue: string }> | undefined;
 const words = new Map<number, { list: string[]; index: Map<string, number> }>();
-const similarity = new Map<number, { temps: Uint8Array; top: Uint32Array }>();
 
 function readCsv(file: string): string[][] {
   return readFileSync(path.join(DATA_DIR, file), 'utf8')
@@ -48,20 +46,6 @@ export function wordsOfLength(length: number) {
     const list = readFileSync(path.join(DATA_DIR, 'words', `${length}.txt`), 'utf8').trim().split('\n');
     entry = { list, index: new Map(list.map((w, i) => [w, i])) };
     words.set(length, entry);
-  }
-  return entry;
-}
-
-/** 정답 하나에 대한 온도(단어 번호 순)와 상위 1000위 단어 번호 */
-export function similarityFor(answerIndex: number) {
-  let entry = similarity.get(answerIndex);
-  if (!entry) {
-    const length = [...answerList()[answerIndex]].length;
-    const count = wordsOfLength(length).list.length;
-    const bytes = gunzipSync(readFileSync(path.join(DATA_DIR, 'sim', `${answerIndex}.bin.gz`)));
-    const top = new Uint32Array(bytes.buffer.slice(bytes.byteOffset + count, bytes.byteOffset + bytes.length));
-    entry = { temps: bytes.subarray(0, count), top };
-    similarity.set(answerIndex, entry);
   }
   return entry;
 }
