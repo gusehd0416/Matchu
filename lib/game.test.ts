@@ -5,8 +5,6 @@ import { judge } from './judge';
 const guess = (word: string, answer: string): GuessResult => ({
   word,
   result: judge(word, answer),
-  temperature: word === answer ? 100 : 30,
-  rank: word === answer ? 0 : null,
   solved: word === answer,
   answer: word === answer ? answer : undefined,
 });

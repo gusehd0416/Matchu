@@ -28,10 +28,6 @@ export type PuzzleInfo = { date: string; day: number; words: { length: number; c
 export type GuessResult = {
   word: string;
   result: SyllableResult[];
-  /** 의미 온도 0~100 */
-  temperature: number;
-  /** 정답과 뜻이 가까운 순위 (1~1000위). 정답이면 0, 1000위 밖이면 null */
-  rank: number | null;
   solved: boolean;
   /** 맞혔거나 마지막 기회를 쓴 뒤에만 온다 */
   answer?: string;

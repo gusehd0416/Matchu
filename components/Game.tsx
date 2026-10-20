@@ -224,7 +224,6 @@ export default function Game() {
                 <span className="syllable">{[...typed][i] ?? ''}</span>
               </div>
             ))}
-            <div className="temp" />
           </div>
         )}
         {Array.from({ length: Math.max(emptyRows, 0) }, (_, i) => (
@@ -232,7 +231,6 @@ export default function Game() {
             {Array.from({ length }, (_, j) => (
               <div key={j} className="tile" />
             ))}
-            <div className="temp" />
           </div>
         ))}
       </section>
@@ -282,7 +280,6 @@ function Progress({ state }: { state: GameState }) {
 }
 
 function Row({ guess }: { guess: GuessResult }) {
-  const rank = guess.solved ? '정답' : guess.rank ? `${guess.rank}위` : '1000위 밖';
   return (
     <div className="row">
       {guess.result.map((s, i) => (
@@ -301,10 +298,6 @@ function Row({ guess }: { guess: GuessResult }) {
           </span>
         </div>
       ))}
-      <div className="temp judged" title="의미 온도: 뜻이 정답과 가까울수록 높아요">
-        <strong>{guess.temperature}°</strong>
-        <span>{rank}</span>
-      </div>
     </div>
   );
 }
@@ -426,10 +419,7 @@ function Help({ onClose }: { onClose: () => void }) {
           {TOPIC_AFTER}번 틀리면 정답의 <strong>주제</strong>를, {CLUE_AFTER}번 틀리면 <strong>한 줄 설명</strong>을 알려드려요.
         </p>
         <p>예: 정답이 지하철(ㅈㅎㅊ)일 때 기차역을 넣으면 ‘차’의 ㅊ은 노랑, ㅏ는 초록이에요.</p>
-        <p>
-          오른쪽 <strong>온도</strong>는 뜻이 정답과 얼마나 가까운지예요. 100°가 정답이고, 정답과 가까운 단어 1000위 안에 들면 순위가
-          나와요. 사전에 있는 명사만 입력할 수 있어요.
-        </p>
+        <p>사전에 있는 명사만 입력할 수 있어요.</p>
         <button className="primary" onClick={onClose}>
           시작하기
         </button>
@@ -443,7 +433,7 @@ function Help({ onClose }: { onClose: () => void }) {
 function Credits() {
   return (
     <p className="credits">
-      단어: 국립국어원 표준국어대사전(korean-noun) · 의미 온도: spaCy ko_core_news_lg · 모두 CC BY-SA 4.0
+      단어: 국립국어원 표준국어대사전(korean-noun) · CC BY-SA 4.0
     </p>
   );
 }

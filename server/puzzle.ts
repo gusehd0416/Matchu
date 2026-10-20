@@ -2,7 +2,7 @@ import 'server-only';
 import { choseongOf } from '../lib/hangul';
 import { judge } from '../lib/judge';
 import { CLUE_AFTER, LAUNCH_DATE, MAX_TRIES, TOPIC_AFTER, kstDate, type GuessResult } from '../lib/game';
-import { answerList, dailySchedule, hintFor, similarityFor, wordsOfLength } from './data';
+import { answerList, dailySchedule, hintFor, wordsOfLength } from './data';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -45,18 +45,13 @@ export function checkGuess(date: string, slot: number, guess: string, attempt: n
   const answer = answerList()[answerIndex];
   if ([...guess].length !== [...answer].length) return { error: 'wrong_length' };
 
-  const position = wordsOfLength([...answer].length).index.get(guess);
-  if (position === undefined) return { error: 'not_in_dictionary' };
+  if (!wordsOfLength([...answer].length).index.has(guess)) return { error: 'not_in_dictionary' };
 
-  const { temps, top } = similarityFor(answerIndex);
   const solved = guess === answer;
-  const rank = solved ? 0 : top.indexOf(position) + 1;
   const hint = hintFor(answer);
   return {
     word: guess,
     result: judge(guess, answer),
-    temperature: temps[position],
-    rank: rank > 0 || solved ? rank : null,
     solved,
     answer: solved || attempt >= MAX_TRIES ? answer : undefined,
     topic: !solved && attempt >= TOPIC_AFTER ? hint.topic : undefined,
