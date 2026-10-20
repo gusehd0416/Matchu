@@ -27,7 +27,7 @@ describe('puzzle', () => {
 
   it('판정: 사전 검사, 온도, 순위, 정답 공개 시점', () => {
     const answer = answerList()[dailySchedule()[0][0]];
-    expect(checkGuess('2026-10-19', 0, '뷁뷁', 1)).toEqual({ error: 'not_in_dictionary' });
+    expect(checkGuess('2026-10-19', 0, '뷁'.repeat([...answer].length), 1)).toEqual({ error: 'not_in_dictionary' });
     expect(checkGuess('2026-10-19', 0, '가나다라마', 1)).toEqual({ error: 'wrong_length' });
     expect(checkGuess('2026-10-19', 9, answer, 1)).toEqual({ error: 'bad_request' });
 
