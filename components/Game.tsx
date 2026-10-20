@@ -5,6 +5,8 @@ import { composeJamo, isCompleteHangul } from '../lib/hangul';
 import { keyMarks, type Mark } from '../lib/judge';
 import {
   MAX_TRIES,
+  TOPIC_AFTER,
+  CLUE_AFTER,
   WORDS_PER_DAY,
   applyGuess,
   goToNextWord,
@@ -196,6 +198,19 @@ export default function Game() {
       <section className="hint" aria-live="polite">
         <span className="hint-label">{state.current + 1}번째 단어 · {length}글자</span>
         <span className="hint-choseong">{info.choseong}</span>
+        {word.topic && (
+          <span className="hint-topic">
+            주제 <strong>{word.topic}</strong>
+          </span>
+        )}
+        {word.clue && <span className="hint-clue">{word.clue}</span>}
+        {word.status === 'playing' && word.guesses.length > 0 && !word.clue && (
+          <span className="hint-next">
+            {word.topic
+              ? `${CLUE_AFTER - word.guesses.length}번 더 틀리면 설명을 알려드려요`
+              : `${TOPIC_AFTER - word.guesses.length}번 더 틀리면 주제를 알려드려요`}
+          </span>
+        )}
       </section>
 
       <section className="board" style={{ ['--cols' as string]: length }}>
@@ -407,6 +422,9 @@ function Help({ onClose }: { onClose: () => void }) {
             <span className="j absent">ㄱ</span> 그 자리에는 없어요
           </li>
         </ul>
+        <p>
+          {TOPIC_AFTER}번 틀리면 정답의 <strong>주제</strong>를, {CLUE_AFTER}번 틀리면 <strong>한 줄 설명</strong>을 알려드려요.
+        </p>
         <p>예: 정답이 지하철(ㅈㅎㅊ)일 때 기차역을 넣으면 ‘차’의 ㅊ은 노랑, ㅏ는 초록이에요.</p>
         <p>
           오른쪽 <strong>온도</strong>는 뜻이 정답과 얼마나 가까운지예요. 100°가 정답이고, 정답과 가까운 단어 1000위 안에 들면 순위가

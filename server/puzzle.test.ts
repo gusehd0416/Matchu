@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerList, dailySchedule, wordsOfLength } from './data';
+import { answerList, dailySchedule, hintFor, wordsOfLength } from './data';
 import { checkGuess, isPlayableDate, puzzleInfo } from './puzzle';
 
 const NOW = Date.parse('2026-10-19T03:00:00Z'); // 한국 시간 2026-10-19 12:00
@@ -25,6 +25,14 @@ describe('puzzle', () => {
     for (const a of answerList()) expect(wordsOfLength([...a].length).index.has(a)).toBe(true);
   });
 
+  it('정답마다 주제와 설명이 있고 설명에 정답 글자가 없다', () => {
+    for (const a of answerList()) {
+      const { topic, clue } = hintFor(a);
+      expect(topic, a).toBeTruthy();
+      for (const ch of a) expect(clue, a).not.toContain(ch);
+    }
+  });
+
   it('판정: 사전 검사, 온도, 순위, 정답 공개 시점', () => {
     const answer = answerList()[dailySchedule()[0][0]];
     expect(checkGuess('2026-10-19', 0, '뷁'.repeat([...answer].length), 1)).toEqual({ error: 'not_in_dictionary' });
@@ -42,6 +50,12 @@ describe('puzzle', () => {
 
     const last = checkGuess('2026-10-19', 0, other, 6);
     expect('error' in last ? null : last.answer).toBe(answer);
+
+    expect(miss.topic).toBeUndefined();
+    const third = checkGuess('2026-10-19', 0, other, 3);
+    expect('error' in third ? null : [typeof third.topic, third.clue]).toEqual(['string', undefined]);
+    const fifth = checkGuess('2026-10-19', 0, other, 5);
+    expect('error' in fifth ? null : typeof fifth.clue).toBe('string');
 
     const hit = checkGuess('2026-10-19', 0, answer, 2);
     expect(hit).toMatchObject({ solved: true, temperature: 100, rank: 0, answer });
