@@ -1,8 +1,8 @@
 import 'server-only';
 import { choseongOf } from '../lib/hangul';
 import { judge } from '../lib/judge';
-import { LAUNCH_DATE, MAX_TRIES, kstDate, type GuessResult } from '../lib/game';
-import { answerList, dailySchedule, similarityFor, wordsOfLength } from './data';
+import { CLUE_AFTER, LAUNCH_DATE, MAX_TRIES, TOPIC_AFTER, kstDate, type GuessResult } from '../lib/game';
+import { answerList, dailySchedule, hintFor, similarityFor, wordsOfLength } from './data';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -34,6 +34,7 @@ export type GuessError = 'bad_request' | 'wrong_length' | 'not_in_dictionary';
 /**
  * 입력 하나를 판정한다. attempt는 이 입력이 몇 번째 시도인지(1부터).
  * 맞혔거나 마지막 기회였으면 정답을 함께 돌려준다.
+ * 틀린 횟수가 쌓이면 주제(TOPIC_AFTER번)와 설명(CLUE_AFTER번)을 함께 돌려준다.
  */
 export function checkGuess(date: string, slot: number, guess: string, attempt: number): GuessResult | { error: GuessError } {
   const slots = answersFor(date);
@@ -50,6 +51,7 @@ export function checkGuess(date: string, slot: number, guess: string, attempt: n
   const { temps, top } = similarityFor(answerIndex);
   const solved = guess === answer;
   const rank = solved ? 0 : top.indexOf(position) + 1;
+  const hint = hintFor(answer);
   return {
     word: guess,
     result: judge(guess, answer),
@@ -57,5 +59,7 @@ export function checkGuess(date: string, slot: number, guess: string, attempt: n
     rank: rank > 0 || solved ? rank : null,
     solved,
     answer: solved || attempt >= MAX_TRIES ? answer : undefined,
+    topic: !solved && attempt >= TOPIC_AFTER ? hint.topic : undefined,
+    clue: !solved && attempt >= CLUE_AFTER ? hint.clue : undefined,
   };
 }

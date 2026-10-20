@@ -8,6 +8,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 
 let answers: string[] | undefined;
 let schedule: number[][] | undefined;
+let hints: Map<string, { topic: string; clue: string }> | undefined;
 const words = new Map<number, { list: string[]; index: Map<string, number> }>();
 const similarity = new Map<number, { temps: Uint8Array; top: Uint32Array }>();
 
@@ -32,6 +33,12 @@ export function dailySchedule(): number[][] {
     for (const [day, , word] of readCsv('puzzles_100days.csv')) (schedule[Number(day) - 1] ??= []).push(index.get(word)!);
   }
   return schedule;
+}
+
+/** 정답별 주제와 한 줄 설명 (data/hints.csv) */
+export function hintFor(word: string): { topic: string; clue: string } {
+  hints ??= new Map(readCsv('hints.csv').map(([w, topic, clue]) => [w, { topic, clue }]));
+  return hints.get(word)!;
 }
 
 /** 글자 수별 입력 허용 단어 */

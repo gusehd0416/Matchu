@@ -2,6 +2,9 @@ import type { SyllableResult } from './judge';
 
 export const MAX_TRIES = 6;
 export const WORDS_PER_DAY = 5;
+/** 이만큼 틀리면 주제, 그다음 설명을 알려준다 */
+export const TOPIC_AFTER = 3;
+export const CLUE_AFTER = 5;
 /** 1일차 퍼즐이 열리는 날 (한국 시간) */
 export const LAUNCH_DATE = '2026-10-19';
 
@@ -32,9 +35,19 @@ export type GuessResult = {
   solved: boolean;
   /** 맞혔거나 마지막 기회를 쓴 뒤에만 온다 */
   answer?: string;
+  /** 틀린 횟수가 TOPIC_AFTER에 닿으면 오는 주제 */
+  topic?: string;
+  /** 틀린 횟수가 CLUE_AFTER에 닿으면 오는 한 줄 설명 */
+  clue?: string;
 };
 
-export type WordState = { guesses: GuessResult[]; status: 'playing' | 'solved' | 'failed'; answer?: string };
+export type WordState = {
+  guesses: GuessResult[];
+  status: 'playing' | 'solved' | 'failed';
+  answer?: string;
+  topic?: string;
+  clue?: string;
+};
 export type GameState = { date: string; current: number; words: WordState[] };
 
 export function newGame(date: string): GameState {
@@ -55,7 +68,13 @@ export function applyGuess(state: GameState, guess: GuessResult): GameState {
     if (i !== state.current) return w;
     const guesses = [...w.guesses, guess];
     const status = guess.solved ? 'solved' : guesses.length >= MAX_TRIES ? 'failed' : 'playing';
-    return { guesses, status, answer: guess.answer ?? w.answer } as WordState;
+    return {
+      guesses,
+      status,
+      answer: guess.answer ?? w.answer,
+      topic: guess.topic ?? w.topic,
+      clue: guess.clue ?? w.clue,
+    } as WordState;
   });
   return { ...state, words };
 }
